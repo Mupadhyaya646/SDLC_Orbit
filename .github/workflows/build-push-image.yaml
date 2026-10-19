@@ -1,0 +1,130 @@
+name: Build and Push Docker Images (sdlc-orbit api + MCP toolkit servers)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'sdlc_orbit/**'
+      - 'migrations/**'
+      - 'frontend/**'
+      - 'toolkits/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.github/workflows/build-push-image.yaml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'sdlc_orbit/**'
+      - 'migrations/**'
+      - 'frontend/**'
+      - 'toolkits/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.github/workflows/build-push-image.yaml'
+    tags:
+      - v*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        image:
+          - image_name: sdlc-orbit-api
+            component: api
+            context: .
+          - image_name: sdlc-orbit-salesforce-mcp
+            component: salesforce-mcp
+            context: ./toolkits/salesforce-mcp
+          - image_name: sdlc-orbit-confluence-mcp
+            component: confluence-mcp
+            context: ./toolkits/confluence-mcp
+          - image_name: sdlc-orbit-gitops-mcp
+            component: gitops-mcp
+            context: ./toolkits/gitops-mcp
+        target:
+          - environment: dev
+            secret_prefix: DEV_
+          - environment: prod
+            secret_prefix: ""
+    # dev always builds (PRs, main pushes, tag pushes). prod builds only on a push to main or a tag,
+    # never on a PR. Same dev/prod ECR naming scheme as the previous (Felix) pipeline: dev has one repo
+    # per component; prod has ONE auto-provisioned repo named after the GitHub repo, with the component
+    # as a tag prefix.
+    # TODO(confirm): PROD_ECR_REPO must equal the ECR repo the ECR Credential Service auto-provisions for
+    # THIS GitHub repo (SDLC_Orbit); the previous repo was literally named "felix".
+    env:
+      ENVIRONMENT: ${{ matrix.target.environment }}
+      SECRET_PREFIX: ${{ matrix.target.secret_prefix }}
+      RUN_THIS_LEG: ${{ matrix.target.environment == 'dev' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref_type == 'tag')) }}
+      ECR_IMAGE_NAME: ${{ matrix.target.environment == 'prod' && 'sdlc-orbit' || matrix.image.image_name }}
+      SHA_TAG_PREFIX: ${{ matrix.target.environment == 'prod' && format('{0}-prod-sha-', matrix.image.component) || format('{0}-sha-', matrix.target.environment) }}
+    steps:
+    - uses: actions/checkout@v4
+      if: env.RUN_THIS_LEG == 'true'
+      with:
+        fetch-depth: 0
+
+    # The API image installs Python and npm packages: both must come from Artifactory (never public
+    # PyPI / npmjs). ASSUMPTION: repo secrets ARTIFACTORY_PIP_CONF and ARTIFACTORY_NPMRC hold ready-made
+    # config files. They are passed as BuildKit secrets, never baked into a layer.
+    - name: Write Artifactory build secrets (api image only)
+      if: env.RUN_THIS_LEG == 'true' && matrix.image.component == 'api'
+      env:
+        PIP_CONF: ${{ secrets.ARTIFACTORY_PIP_CONF }}
+        NPMRC: ${{ secrets.ARTIFACTORY_NPMRC }}
+      run: |
+        test -n "$PIP_CONF" && test -n "$NPMRC" || { echo "ARTIFACTORY_PIP_CONF / ARTIFACTORY_NPMRC secrets are not set"; exit 1; }
+        mkdir -p "$RUNNER_TEMP/secrets"
+        printf '%s' "$PIP_CONF" > "$RUNNER_TEMP/secrets/pip.conf"
+        printf '%s' "$NPMRC" > "$RUNNER_TEMP/secrets/npmrc"
+
+    - name: Generate Docker Metadata
+      id: meta
+      if: env.RUN_THIS_LEG == 'true'
+      uses: docker/metadata-action@v5
+      env:
+        DOCKER_METADATA_PR_HEAD_SHA: true
+      with:
+        images: |
+          ${{ secrets[format('{0}LIGHT_DOCKER_REPOSITORY_URL', env.SECRET_PREFIX)] }}/${{ env.ECR_IMAGE_NAME }}
+        tags: |
+          type=sha,prefix=sha-
+          type=sha,prefix=sha-,format=short
+          type=sha,prefix=${{ env.SHA_TAG_PREFIX }},format=short
+          type=ref,event=pr
+          type=ref,event=branch
+          type=ref,event=tag
+
+    - name: Login to LIGHT AWS ECR
+      if: env.RUN_THIS_LEG == 'true'
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets[format('{0}LIGHT_DOCKER_USER', env.SECRET_PREFIX)] }}
+        password: ${{ secrets[format('{0}LIGHT_DOCKER_TOKEN', env.SECRET_PREFIX)] }}
+        registry: ${{ secrets[format('{0}LIGHT_DOCKER_REPOSITORY_URL', env.SECRET_PREFIX)] }}
+        ecr: false
+
+    - name: "Build and push docker image (api - dashboard + API, Artifactory secrets)"
+      if: env.RUN_THIS_LEG == 'true' && matrix.image.component == 'api'
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ matrix.image.context }}
+        tags: ${{ steps.meta.outputs.tags }}
+        push: true
+        provenance: false
+        secret-files: |
+          pip_conf=${{ runner.temp }}/secrets/pip.conf
+          npmrc=${{ runner.temp }}/secrets/npmrc
+
+    - name: Build and push docker image (MCP toolkit server)
+      if: env.RUN_THIS_LEG == 'true' && matrix.image.component != 'api'
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ matrix.image.context }}
+        tags: ${{ steps.meta.outputs.tags }}
+        push: true
+        provenance: false

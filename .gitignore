@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+!.env.example
+.DS_Store
+node_modules/
+# built dashboard (produced by the Docker build or `npm run build`)
+sdlc_orbit/static/

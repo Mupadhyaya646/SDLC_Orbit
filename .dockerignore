@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__/
+*.pyc
+.env
+.env.*
+tests/
+docs/
+toolkits/
+frontend/node_modules/
+sdlc_orbit/static/

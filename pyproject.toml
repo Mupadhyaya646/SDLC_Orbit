@@ -1,0 +1,20 @@
+[project]
+name = "sdlc-orbit"
+version = "0.1.0"
+description = "LangGraph orchestration of the Salesforce SDLC specialist agents (replaces the Cortex-orchestrated Felix pipeline)."
+requires-python = ">=3.12"
+# Runtime dependencies live in requirements.txt (single source for the Docker build).
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["sdlc_orbit*"]
+
+[tool.setuptools.package-data]
+sdlc_orbit = ["prompts/*.md", "static/**/*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

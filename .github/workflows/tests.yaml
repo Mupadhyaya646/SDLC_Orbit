@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Lilly policy: packages come from Artifactory only (never public PyPI).
+      # ASSUMPTION: a repo secret ARTIFACTORY_PIP_CONF holds a ready-made pip.conf for Lilly-Python.
+      - name: Configure pip for Artifactory
+        env:
+          PIP_CONF: ${{ secrets.ARTIFACTORY_PIP_CONF }}
+        run: |
+          test -n "$PIP_CONF" || { echo "ARTIFACTORY_PIP_CONF secret is not set"; exit 1; }
+          mkdir -p ~/.config/pip && printf '%s' "$PIP_CONF" > ~/.config/pip/pip.conf
+      - run: pip install -r requirements.txt
+      # Runs gates / identity / view tests AND the LangGraph flow tests (skipped only if deps are missing).
+      - run: python -m unittest discover -s tests -v

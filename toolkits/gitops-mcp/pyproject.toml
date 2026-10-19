@@ -1,0 +1,7 @@
+[project]
+name = "gitops-mcp-server"
+version = "0.1.0"
+description = "git-ops MCP Server"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
