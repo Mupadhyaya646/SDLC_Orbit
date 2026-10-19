@@ -69,7 +69,7 @@ async def run_migrations() -> None:
     """Apply every migrations/*.sql in filename order (all idempotent)."""
     async with pool().connection() as conn:
         for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-            await conn.execute(path.read_text(encoding="utf-8"))
+            await conn.execute(path.read_text(encoding="utf-8"), prepare=False)
             logger.info("applied migration %s", path.name)
 
 
