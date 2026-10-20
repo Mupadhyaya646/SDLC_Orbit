@@ -64,7 +64,6 @@ force-app/main/default/
 │   ├── fields/
 │   └── validationRules/
 ├── permissionsets/
-├── flows/
 └── layouts/
 ```
 
@@ -94,8 +93,8 @@ Available objects/fields: Feedback__c, CMH_Rating__c
 
 ## Boundaries
 
-**DO:** Objects, Fields, Validation Rules, Flows, Permission Sets, Reports, Page Layouts, SF CLI
-**DON'T:** Apex, LWC, Triggers → Tell user to use salesforce-developer
+**DO:** Objects, Fields, Validation Rules, Permission Sets, Reports, Page Layouts, SF CLI
+**DON'T:** Apex, Triggers, Flows, LWC → Tell user to use salesforce-developer
 
 ---
 

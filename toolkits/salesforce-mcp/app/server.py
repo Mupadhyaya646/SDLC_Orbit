@@ -158,9 +158,10 @@ def sf_read_metadata(metadata_type: str = "", full_name: str = "") -> str:
     Read existing metadata to check for conflicts or existing components before creating.
 
     Args:
-        metadata_type: One of CustomField, ValidationRule, PermissionSet, Flow. Required.
+        metadata_type: One of CustomField, ValidationRule, PermissionSet, Flow,
+            ApexClass, ApexTrigger. Required.
         full_name: The component's full name (e.g. "Account.My_Field__c" for
-            a CustomField; a bare name for ValidationRule/PermissionSet/Flow). Required.
+            a CustomField; a bare name for every other type). Required.
 
     Returns:
         JSON string with success flag, found (bool), and the record if found.
@@ -192,16 +193,22 @@ def sf_read_metadata(metadata_type: str = "", full_name: str = "") -> str:
 @mcp.tool()
 def sf_write_metadata(metadata_type: str = "", full_name: str = "", metadata_json: str = "") -> str:
     """
-    Create/update declarative metadata (objects, fields, validation rules,
-    flows, permission sets, layouts) in the SFDX workspace.
+    Create/update metadata (fields, validation rules, flows, permission sets,
+    Apex classes, Apex triggers) in the connected org.
 
     Args:
-        metadata_type: One of CustomField, ValidationRule, PermissionSet, Flow. Required.
-        full_name: The component's intended full name (e.g. "Account.My_Field__c"). Required.
+        metadata_type: One of CustomField, ValidationRule, PermissionSet, Flow,
+            ApexClass, ApexTrigger. Required.
+        full_name: The component's intended full name (e.g. "Account.My_Field__c",
+            "AccountService", "AccountTrigger"). Required.
         metadata_json: JSON string of the Tooling API REST body for this
-            component, e.g. '{"Metadata": {"label": "My Field", "type":
-            "Text", "length": 80}}'. FullName is set automatically from the
-            full_name argument. Required.
+            component. FullName is set automatically from the full_name
+            argument. Required. Examples:
+              CustomField: '{"Metadata": {"label": "My Field", "type": "Text", "length": 80}}'
+              Flow:        '{"Metadata": {<Flow metadata>, "status": "Active"}}' (each call saves a new version)
+              ApexClass:   '{"Body": "public with sharing class AccountService { ... }"}'
+              ApexTrigger: '{"TableEnumOrId": "Account", "Body": "trigger AccountTrigger on Account (before insert) { ... }"}'
+            Apex writes compile in the org and only work in sandbox/dev/scratch orgs.
 
     Returns:
         JSON string with success flag, action ("created"|"updated"), and id.

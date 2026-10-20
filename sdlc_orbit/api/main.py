@@ -42,7 +42,8 @@ from pydantic import BaseModel
 
 from .. import db
 from ..agents import AGENTS
-from ..config import llm_settings, runtime_settings
+from ..config import cortex_settings, llm_settings, runtime_settings
+from ..cortex import CortexClient
 from ..graph import Deps, build_graph
 from ..llm import get_chat_model
 from ..mcp_tools import get_registry
@@ -125,7 +126,9 @@ async def _sweep_orphaned_runs() -> int:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     rt = runtime_settings()
-    llm_settings()  # fail fast on a missing ANTHROPIC_API_KEY / LLM_MODEL
+    cortex_cfg = cortex_settings()
+    if cortex_cfg is None:
+        llm_settings()  # fail fast on a missing ANTHROPIC_API_KEY / LLM_MODEL
     await db.init_pool(max_size=rt.db_pool_max)
     await db.run_migrations()
     saver = AsyncPostgresSaver(db.pool())
@@ -137,6 +140,7 @@ async def lifespan(app: FastAPI):
         store=db,
         max_rework_loops=rt.max_rework_loops,
         require_design_confirmation=os.getenv("ORBIT_REQUIRE_DESIGN_CONFIRMATION", "true").lower() in ("1", "true", "yes", "on"),
+        cortex=CortexClient(cortex_cfg) if cortex_cfg else None,
     )
     graph = build_graph(deps).compile(checkpointer=saver)
     app.state.runs = RunManager(graph, rt.recursion_limit)

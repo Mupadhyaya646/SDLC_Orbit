@@ -130,6 +130,7 @@ class Deps:
     store: Any  # append_turn, record_gate, set_ui_state, set_status, list_gates, get_session, record_handoff
     max_rework_loops: int = 3
     require_design_confirmation: bool = True
+    cortex: Any = None  # CortexClient: when set, agents run on Cortex instead of llm/tools
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -195,6 +196,49 @@ def build_graph(deps: Deps) -> StateGraph:
 
     # ------------------------------------------------------- agent execution
 
+    async def run_cortex_agent(
+        state: dict,
+        upd: dict,
+        *,
+        spec: Any,
+        role: str,
+        step: str,
+        thread_key: str,
+        task: str | None,
+        record_user: bool,
+        extra: tuple[tuple[str, str], ...],
+        output_key: str | None,
+    ) -> str:
+        """One turn on the registered Cortex agent. Cortex keeps no chat history across /ask calls and the
+        registered agents carry no role prompt, so each call sends the role prompt, SESSION CONTEXT, the
+        conversation so far (kept in ``threads``) and the current message."""
+        sid = state["session_id"]
+        outputs = {**(state.get("outputs") or {}), **(upd.get("outputs") or {})}
+        instructions = render_system_prompt(role, session_id=sid, outputs=outputs, extra_sections=extra)
+        thread = list((upd.get("threads") or {}).get(thread_key) or (state.get("threads") or {}).get(thread_key) or [])
+        message = task or "Continue where you left off."
+        parts = [instructions]
+        if thread:
+            history = "\n\n".join(f"### {t['role'].upper()}\n\n{t['content']}" for t in thread)
+            parts.append(f"## CONVERSATION SO FAR (oldest first)\n\n{history}")
+        parts.append(f"## CURRENT MESSAGE (the invocation prompt -- respond to this)\n\n{message}")
+        q = "\n\n---\n\n".join(parts)
+
+        if record_user and task:
+            await say(state, spec.agent_id, task, step, role="user")
+
+        async def on_activity(text: str) -> None:
+            await say(state, spec.agent_id, text, step, role="activity")
+
+        text = await deps.cortex.ask(spec.agent_id, q, f"{sid}:{thread_key}", on_activity)
+        await say(state, spec.agent_id, text, step)
+        await deps.store.record_handoff(sid, spec.agent_id, BACKEND_AGENT, {"step": step, "output": text})
+        thread += [{"role": "user", "content": message}, {"role": "assistant", "content": text}]
+        upd["threads"] = {**(upd.get("threads") or {}), thread_key: thread}
+        if output_key:
+            upd["outputs"] = {**(upd.get("outputs") or {}), output_key: text}
+        return text
+
     async def run_agent(
         state: dict,
         upd: dict,
@@ -214,6 +258,12 @@ def build_graph(deps: Deps) -> StateGraph:
         spec = AGENTS[role]
         sid = state["session_id"]
         await publish({**state, **upd}, step, agent=spec.agent_id, status="in_progress")
+
+        if deps.cortex is not None:
+            return await run_cortex_agent(
+                state, upd, spec=spec, role=role, step=step, thread_key=thread_key, task=task,
+                record_user=record_user, extra=extra, output_key=output_key,
+            )
 
         try:
             tools = await deps.tools(server or spec.server, spec.tools)

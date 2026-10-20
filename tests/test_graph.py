@@ -318,3 +318,89 @@ class GraphFlow(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+if HAVE_DEPS:
+
+    class FakeCortex:
+        """Stands in for CortexClient: records calls, replies per registered agent id."""
+
+        def __init__(self, scripts):
+            self.scripts = {k: list(v) for k, v in scripts.items()}
+            self.calls = []
+
+        async def ask(self, agent, q, session_id, on_activity=None):
+            self.calls.append((agent, q, session_id))
+            queue = self.scripts[agent]
+            return queue.pop(0) if len(queue) > 1 else queue[0]
+
+
+@unittest.skipUnless(HAVE_DEPS, "langgraph / langchain-core not installed")
+class CortexPrompt(unittest.IsolatedAsyncioTestCase):
+    async def test_role_prompt_history_and_current_message_are_sent(self):
+        from sdlc_orbit.agents import AGENTS, load_prompt
+
+        design = AGENTS["design"].agent_id
+        cortex = FakeCortex({design: ["no plan here", PLAN], **{a.agent_id: ["ok"] for k, a in AGENTS.items() if k != "design"}})
+        store = FakeStore()
+        g = build_graph(Deps(llm=lambda tier: None, tools=None, store=store, cortex=cortex)).compile(checkpointer=InMemorySaver())
+        await g.ainvoke({"session_id": "c2", "request": "Add a Phone validation rule"}, {"configurable": {"thread_id": "c2"}, "recursion_limit": 200})
+
+        first, second = [q for a, q, _ in cortex.calls if a == design][:2]
+        self.assertIn(load_prompt("design").strip()[:200], first)
+        self.assertTrue(first.rstrip().endswith("Add a Phone validation rule"))
+        self.assertNotIn("CONVERSATION SO FAR", first)
+        self.assertIn("CONVERSATION SO FAR", second)
+        self.assertIn("no plan here", second)
+        self.assertIn("Add a Phone validation rule", second)
+
+
+@unittest.skipUnless(HAVE_DEPS, "langgraph / langchain-core not installed")
+class CortexMode(unittest.IsolatedAsyncioTestCase):
+    async def test_agents_run_on_cortex_by_registered_name(self):
+        from sdlc_orbit.agents import AGENTS
+
+        scripts = {
+            AGENTS["design"].agent_id: [PLAN],
+            AGENTS["admin"].agent_id: ["Admin done"],
+            AGENTS["developer"].agent_id: ["Dev done"],
+            AGENTS["unit_testing"].agent_id: ["Tests done"],
+            AGENTS["code_review"].agent_id: ["## Verdict: APPROVED"],
+            AGENTS["github_commit"].agent_id: ["Manual change review\n[Y] YES\n[N] NO", "Status: SUCCESS"],
+            AGENTS["devops"].agent_id: ["Status: SUCCESS"],
+            AGENTS["documentation"].agent_id: ["Documentation published"],
+        }
+        cortex = FakeCortex(scripts)
+        store = FakeStore()
+
+        async def no_local_tools(server, allow):
+            raise AssertionError("Cortex mode must not load local MCP tools")
+
+        deps = Deps(llm=lambda tier: None, tools=no_local_tools, store=store, cortex=cortex)
+        graph = build_graph(deps).compile(checkpointer=InMemorySaver())
+        cfg = {"configurable": {"thread_id": "c1"}, "recursion_limit": 200}
+        await graph.ainvoke({"session_id": "c1", "request": "Add a field Foo__c"}, cfg)
+
+        async def answer(text):
+            snap = await graph.aget_state(cfg)
+            payload = next(i.value for t in snap.tasks for i in t.interrupts)
+            for g in store.gates:
+                if g["id"] == payload["gate_id"]:
+                    g["answer"], g["answered_by"] = text, "t@lilly.com"
+            await graph.ainvoke(
+                Command(resume={"text": text, "answered_by": "t@lilly.com", "gate_id": payload["gate_id"], "source": "api"}), cfg
+            )
+
+        for text in ["yes", "Y", "y", "y", "y", "m", "y", "s"]:
+            await answer(text)
+
+        snap = await graph.aget_state(cfg)
+        open_gate = [i.value["name"] for t in snap.tasks for i in t.interrupts]
+        self.assertEqual(store.status["c1"], "complete", f"open gate: {open_gate}")
+        called = [a for a, _, _ in cortex.calls]
+        self.assertEqual(called[0], AGENTS["design"].agent_id)
+        self.assertIn(AGENTS["devops"].agent_id, called)
+        self.assertTrue(all(sid.startswith("c1:") for _, _, sid in cortex.calls))
+        design_q = cortex.calls[0][1]
+        self.assertIn("Add a field Foo__c", design_q)
+        self.assertIn("SESSION CONTEXT", design_q)

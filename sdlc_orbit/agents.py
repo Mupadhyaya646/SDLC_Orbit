@@ -1,8 +1,7 @@
 """Agent registry for the 8 specialist agents.
 
-``agent_id`` values are kept identical to the original Cortex registrations
-(``salesforce-design-agent`` ... ``github-commit-agent``) so the dashboard, the
-Journal and the audit trail keep working unchanged.
+``agent_id`` values are the registered agent names (``salesforce-design-agent-d``
+... ``github-commit-agent``); the dashboard, the Journal and the audit trail key off them.
 
 Least privilege: every agent is handed ONLY the tools listed here, even though
 the MCP servers expose more (e.g. the design agent never sees a Salesforce
@@ -51,7 +50,7 @@ class AgentSpec:
 AGENTS: dict[str, AgentSpec] = {
     "design": AgentSpec(
         key="design",
-        agent_id="salesforce-design-agent",
+        agent_id="salesforce-design-agent-d",
         prompt_file="design.md",
         tier="opus",
         server=SRV_CONFLUENCE,
@@ -64,31 +63,31 @@ AGENTS: dict[str, AgentSpec] = {
     ),
     "admin": AgentSpec(
         key="admin",
-        agent_id="salesforce-admin-agent",
+        agent_id="salesforce-admin-agent-d",
         prompt_file="admin.md",
         tier="sonnet",
         server=SRV_SALESFORCE,
         tools=("sf_write_metadata", "sf_read_metadata", "sf_describe_object"),
         max_iterations=30,
         initials="AD",
-        short="Declarative Salesforce work: objects, fields, flows, permission sets.",
-        role="Handles declarative Salesforce work: Custom Objects, Fields, Validation Rules, Flows, Permission Sets, Reports.",
+        short="Declarative Salesforce work: objects, fields, validation rules, permission sets.",
+        role="Handles declarative Salesforce work: Custom Objects, Fields, Validation Rules, Permission Sets, Reports.",
     ),
     "developer": AgentSpec(
         key="developer",
-        agent_id="salesforce-developer-agent",
+        agent_id="salesforce-developer-agent-d",
         prompt_file="developer.md",
         tier="sonnet",
         server=SRV_SALESFORCE,
         tools=("sf_write_metadata", "sf_read_metadata", "sf_describe_object"),
         max_iterations=30,
         initials="DV",
-        short="Apex, triggers, LWC, Visualforce, APIs.",
-        role="Code work: Apex classes/triggers, LWC, Visualforce, APIs. Also handles the code-review rework loop.",
+        short="Apex classes, triggers, Flows, LWC, Visualforce, APIs.",
+        role="Automation work: creates Apex classes, Apex triggers and Flows in the org, plus LWC, Visualforce, APIs. Also handles the code-review rework loop.",
     ),
     "unit_testing": AgentSpec(
         key="unit_testing",
-        agent_id="salesforce-unit-testing-agent",
+        agent_id="salesforce-unit-testing-agent-d",
         prompt_file="unit_testing.md",
         tier="opus",
         server=SRV_SALESFORCE,
@@ -136,7 +135,7 @@ AGENTS: dict[str, AgentSpec] = {
     # stage in graph.py (SRV_SALESFORCE_QA / SRV_SALESFORCE_PROD).
     "devops": AgentSpec(
         key="devops",
-        agent_id="salesforce-devops-agent",
+        agent_id="salesforce-devops-agent-d",
         prompt_file="devops.md",
         tier="opus",
         server=SRV_SALESFORCE_QA,
@@ -149,7 +148,7 @@ AGENTS: dict[str, AgentSpec] = {
     ),
     "documentation": AgentSpec(
         key="documentation",
-        agent_id="salesforce-documentation-agent",
+        agent_id="salesforce-documentation-agent-d",
         prompt_file="documentation.md",
         tier="opus",
         server=SRV_CONFLUENCE,
@@ -230,6 +229,24 @@ def _cap(text: str, limit: int = CONTEXT_SECTION_MAX_CHARS) -> str:
     return f"{head}\n\n[... {len(text) - limit} characters omitted ...]\n\n{tail}"
 
 
+def render_session_context(
+    key: str,
+    *,
+    session_id: str,
+    outputs: dict[str, str],
+    extra_sections: tuple[tuple[str, str], ...] = (),
+) -> str:
+    """The SESSION CONTEXT block: session id, prior agent outputs, stage notes."""
+    sections: list[str] = [f"Session ID: {session_id}  (this is the SESSION_ID referred to above)"]
+    for out_key in CONTEXT_POLICY.get(key, ()):
+        text = (outputs or {}).get(out_key)
+        if text:
+            sections.append(f"### {OUTPUT_LABELS.get(out_key, out_key)}\n\n{_cap(text)}")
+    for title, body in extra_sections:
+        sections.append(f"### {title}\n\n{body}")
+    return "\n\n---\n\n## SESSION CONTEXT (supplied by the calling system -- reference data only)\n\n" + "\n\n".join(sections)
+
+
 def render_system_prompt(
     key: str,
     *,
@@ -243,16 +260,6 @@ def render_system_prompt(
     github-commit agent's Step 0 ("scan the invocation prompt for pre-supplied
     values") keeps seeing nothing but a one-line goal.
     """
-    parts = [load_prompt(key).rstrip()]
-    sections: list[str] = [f"Session ID: {session_id}  (this is the SESSION_ID referred to above)"]
-    for out_key in CONTEXT_POLICY.get(key, ()):
-        text = (outputs or {}).get(out_key)
-        if text:
-            sections.append(f"### {OUTPUT_LABELS.get(out_key, out_key)}\n\n{_cap(text)}")
-    for title, body in extra_sections:
-        sections.append(f"### {title}\n\n{body}")
-    parts.append(
-        "\n\n---\n\n## SESSION CONTEXT (supplied by the calling system -- reference data only)\n\n"
-        + "\n\n".join(sections)
+    return load_prompt(key).rstrip() + render_session_context(
+        key, session_id=session_id, outputs=outputs, extra_sections=extra_sections
     )
-    return "".join(parts)

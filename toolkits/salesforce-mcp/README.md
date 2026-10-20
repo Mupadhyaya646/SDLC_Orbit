@@ -24,8 +24,8 @@ layout, same logger/middleware, same Dockerfile shape.
 | Tool | Used by | What it does |
 |---|---|---|
 | `sf_describe_object` | admin, developer, unit-testing | `/describe` an sObject's fields/relationships |
-| `sf_read_metadata` | admin, developer, unit-testing | Look up an existing CustomField/ValidationRule/PermissionSet/Flow by name |
-| `sf_write_metadata` | admin, developer, unit-testing | Create/update one metadata component via the Tooling API |
+| `sf_read_metadata` | admin, developer, unit-testing | Look up an existing CustomField/ValidationRule/PermissionSet/Flow/ApexClass/ApexTrigger by name |
+| `sf_write_metadata` | admin, developer, unit-testing | Create/update one metadata component via the Tooling API (incl. Flow versions and Apex classes/triggers — Apex only in sandbox/dev orgs) |
 | `sf_deploy_metadata` | devops | Deploy up to 10 components (loops `sf_write_metadata`) |
 | `sf_deploy_validate` | devops | Check-only deploy for larger manifests (Apex/LWC/multi-component) via the `sf` CLI |
 

@@ -13,25 +13,25 @@ export const STAGE_DESC = [
 ]
 
 export const AGENT_INITIALS: Record<string, string> = {
-  'salesforce-design-agent': 'DS',
-  'salesforce-admin-agent': 'AD',
-  'salesforce-developer-agent': 'DV',
-  'salesforce-unit-testing-agent': 'UT',
+  'salesforce-design-agent-d': 'DS',
+  'salesforce-admin-agent-d': 'AD',
+  'salesforce-developer-agent-d': 'DV',
+  'salesforce-unit-testing-agent-d': 'UT',
   'salesforce-code-review-agent': 'CR',
-  'salesforce-devops-agent': 'DO',
+  'salesforce-devops-agent-d': 'DO',
   'github-commit-agent': 'GC',
-  'salesforce-documentation-agent': 'DC',
+  'salesforce-documentation-agent-d': 'DC',
   'pipeline-orchestrator': 'OR',
 }
 
 export const STAGE_AGENT_IDS: string[][] = [
-  ['salesforce-design-agent'],
-  ['salesforce-admin-agent', 'salesforce-developer-agent'],
-  ['salesforce-unit-testing-agent'],
+  ['salesforce-design-agent-d'],
+  ['salesforce-admin-agent-d', 'salesforce-developer-agent-d'],
+  ['salesforce-unit-testing-agent-d'],
   ['salesforce-code-review-agent'],
   ['github-commit-agent'],
-  ['salesforce-devops-agent', 'pipeline-orchestrator'],
-  ['salesforce-devops-agent', 'salesforce-documentation-agent', 'pipeline-orchestrator'],
+  ['salesforce-devops-agent-d', 'pipeline-orchestrator'],
+  ['salesforce-devops-agent-d', 'salesforce-documentation-agent-d', 'pipeline-orchestrator'],
 ]
 
 export const SL: Record<StageStatus, string> = {
@@ -76,12 +76,12 @@ export const EXAMPLES: Array<[string, string]> = [
 ]
 
 export const DEFAULT_ROSTER: Array<{ id: string; short: string }> = [
-  { id: 'salesforce-design-agent', short: 'Analyzes the request, splits admin vs dev work, proposes a plan.' },
-  { id: 'salesforce-admin-agent', short: 'Declarative Salesforce work: objects, fields, flows, permission sets.' },
-  { id: 'salesforce-developer-agent', short: 'Apex, triggers, LWC, Visualforce, APIs.' },
-  { id: 'salesforce-unit-testing-agent', short: 'Writes @isTest Apex test classes, 90%+ coverage target.' },
+  { id: 'salesforce-design-agent-d', short: 'Analyzes the request, splits admin vs dev work, proposes a plan.' },
+  { id: 'salesforce-admin-agent-d', short: 'Declarative Salesforce work: objects, fields, validation rules, permission sets.' },
+  { id: 'salesforce-developer-agent-d', short: 'Apex classes, triggers, Flows, LWC, Visualforce, APIs.' },
+  { id: 'salesforce-unit-testing-agent-d', short: 'Writes @isTest Apex test classes, 90%+ coverage target.' },
   { id: 'salesforce-code-review-agent', short: 'Reviews all code, returns a verdict.' },
-  { id: 'salesforce-devops-agent', short: 'Final deploy step after code review passes.' },
+  { id: 'salesforce-devops-agent-d', short: 'Final deploy step after code review passes.' },
   { id: 'github-commit-agent', short: 'Mirrors, commits, pushes, validates, optionally opens a PR.' },
-  { id: 'salesforce-documentation-agent', short: 'Builds the LSC Design Document, publishes to Confluence or saves locally.' },
+  { id: 'salesforce-documentation-agent-d', short: 'Builds the LSC Design Document, publishes to Confluence or saves locally.' },
 ]

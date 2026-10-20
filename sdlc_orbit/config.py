@@ -112,6 +112,48 @@ def llm_settings() -> LlmSettings:
     )
 
 
+@dataclass(frozen=True)
+class CortexSettings:
+    base_url: str
+    user: str  # x-user (email)
+    groups: str  # x-groups (comma separated)
+    org: str  # x-org -> {"name": org}
+    bearer: str | None  # optional gateway token -> Authorization: Bearer
+    extra_headers: dict[str, str] = field(default_factory=dict)  # e.g. x-application-id
+    timeout: float = 1800.0
+    # Azure AD client-credentials app; the gateway needs its token as Authorization: Bearer.
+    tenant_id: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    scope: str = "api://Cortex.lilly.com/.default"
+
+
+DEFAULT_CORTEX_BASE_URL = "https://gateway.apim.lilly.com/cortex"
+
+
+def cortex_settings() -> CortexSettings | None:
+    """None unless ``LLM_PROVIDER=cortex``. Then the registered Cortex agents (by ``agent_id``)
+    run each turn and no Anthropic key is needed."""
+    if (_env("LLM_PROVIDER", default="anthropic") or "").lower() != "cortex":
+        return None
+    user = _env("CORTEX_USER")
+    if not user:
+        raise RuntimeError("LLM_PROVIDER=cortex requires CORTEX_USER (the x-user email sent to Cortex).")
+    return CortexSettings(
+        base_url=(_env("CORTEX_BASE_URL", default=DEFAULT_CORTEX_BASE_URL) or DEFAULT_CORTEX_BASE_URL).rstrip("/"),
+        user=user,
+        groups=_env("CORTEX_GROUPS", default="") or "",
+        org=_env("CORTEX_ORG", default="") or "",
+        bearer=_env("CORTEX_BEARER_TOKEN"),
+        extra_headers=_parse_headers(_env("CORTEX_EXTRA_HEADERS")),
+        timeout=_float("CORTEX_TIMEOUT_SECONDS", 1800.0),
+        tenant_id=_env("AZURE_TENANT_ID"),
+        client_id=_env("AZURE_CLIENT_ID"),
+        client_secret=_env("AZURE_CLIENT_SECRET"),
+        scope=_env("CORTEX_SCOPE", default="api://Cortex.lilly.com/.default") or "api://Cortex.lilly.com/.default",
+    )
+
+
 # ---------------------------------------------------------------------------
 # MCP toolkit servers (Lane 4)
 # ---------------------------------------------------------------------------

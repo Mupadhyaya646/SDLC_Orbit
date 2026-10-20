@@ -26,10 +26,11 @@ export function TurnsProvider({ sid, children }: { sid: string | null; children:
         const ev = JSON.parse(m.data) as SSEEvent
         if (seenSeq.current.has(ev.seq)) return
         seenSeq.current.add(ev.seq)
-        if (ev.kind === 'user' || ev.kind === 'agent_text') {
+        const kind = ev.kind
+        if (kind === 'user' || kind === 'agent_text') {
           setTurns((prev) => [
             ...prev,
-            { agent: ev.data.agent, text: ev.data.text, created_at: ev.data.created_at, role: ev.kind, stage: ev.data.stage ?? null },
+            { agent: ev.data.agent, text: ev.data.text, created_at: ev.data.created_at, role: kind, stage: ev.data.stage ?? null },
           ])
         }
       } catch {

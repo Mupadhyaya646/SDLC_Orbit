@@ -87,21 +87,21 @@ class StatusDerivation(unittest.TestCase):
         self.assertEqual(view.stage_statuses("aborted", {"step": "uat"})[5], "cancelled")
 
     def test_agent_status(self):
-        state = {"step": "design", "active_agents": ["salesforce-design-agent"]}
+        state = {"step": "design", "active_agents": ["salesforce-design-agent-d"]}
         s = view.agent_statuses("awaiting_input", state)
-        self.assertEqual(s["salesforce-design-agent"], "awaiting")
-        self.assertEqual(s["salesforce-admin-agent"], "idle")
+        self.assertEqual(s["salesforce-design-agent-d"], "awaiting")
+        self.assertEqual(s["salesforce-admin-agent-d"], "idle")
 
     def test_devops_runs_in_two_stages(self):
         s = view.agent_statuses("in_progress", {"step": "prod_deploy", "active_agents": []})
-        self.assertEqual(s["salesforce-devops-agent"], "running")
+        self.assertEqual(s["salesforce-devops-agent-d"], "running")
         self.assertEqual(s["github-commit-agent"], "done")
 
     def test_roster_ids_match_original_agents(self):
         ids = {a["id"] for a in view.AGENT_ROSTER}
         self.assertEqual(len(ids), 8)
         self.assertIn("github-commit-agent", ids)
-        self.assertIn("salesforce-design-agent", ids)
+        self.assertIn("salesforce-design-agent-d", ids)
 
 
 class LogAndJournal(unittest.TestCase):

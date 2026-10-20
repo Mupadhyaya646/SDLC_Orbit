@@ -77,11 +77,11 @@ Updated: [timestamp]
 [One sentence: what user wants]
 
 ## Admin Work
-- [Object/Field/Flow name]
-- [Object/Field/Flow name]
+- [Object/Field/Validation Rule name]
+- [Object/Field/Validation Rule name]
 
 ## Dev Work
-- [Trigger/Class/LWC description]
+- [Apex Class/Trigger/Flow/LWC description]
 - [Logic summary]
 
 ## Order
@@ -164,8 +164,10 @@ Source: agent-functional-memory/[filename].md  (or "No matching functional memor
 
 ## Classification
 
-**Admin:** Objects, Fields, Validation Rules, Flows, Permission Sets, Reports
-**Dev:** Apex, Triggers, LWC, Visualforce, APIs, Integrations
+**Admin:** Objects, Fields, Validation Rules, Permission Sets, Reports, Page Layouts
+**Dev:** Apex Classes, Apex Triggers, Flows (record-triggered, screen, autolaunched, scheduled), LWC, Visualforce, APIs, Integrations
+
+All automation -- Apex classes, triggers AND Flows -- goes in the DEV PROMPT, never the ADMIN PROMPT. The developer agent creates them in the org with sf_write_metadata.
 
 ---
 

@@ -26,7 +26,7 @@ from .base import GitOpsToolBase
 logger = logging.getLogger(__name__)
 
 _SF_CLI_TIMEOUT_SECONDS = 30
-_DEFAULT_SF_LOGIN_URL = "https://login.salesforce.com"
+_DEFAULT_SF_LOGIN_URL = "https://test.salesforce.com"
 
 
 class SfListOrgsTool(GitOpsToolBase):
